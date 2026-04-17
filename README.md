@@ -6,6 +6,7 @@ Juegos de espanol
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Service & Care - Oppenheimer Park</title>
+    <!-- Cargando librerías externas -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -14,71 +15,152 @@ Juegos de espanol
     <style>
         .preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
+        /* Animaciones para las cartas */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-card { animation: fadeIn 0.5s ease-out forwards; }
     </style>
 </head>
-<body>
+<body class="bg-slate-50">
     <div id="root"></div>
+
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
+
+        // Componente para manejar iconos de Lucide
         const Icon = ({ name, color, size = 20 }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
             return <i data-lucide={name} style={{ color: color, width: size, height: size }}></i>;
         };
 
         const PHRASES = [
-            { id: 1, en: "Coffee or tea?", es: "¿Café o té?", icon: "coffee", color: "#b45309" },
+            { id: 1, en: "Would you like coffee or tea?", es: "¿Quiere café o té?", icon: "coffee", color: "#b45309" },
             { id: 2, en: "Sugar or milk?", es: "¿Azúcar o leche?", icon: "coffee", color: "#f59e0b" },
-            { id: 3, en: "It is hot!", es: "¡Está caliente!", icon: "info", color: "#ef4444" },
-            { id: 4, en: "Good morning", es: "Buenos días", icon: "heart", color: "#ec4899" }
+            { id: 3, en: "Careful, it's hot!", es: "¡Cuidado, está caliente!", icon: "info", color: "#ef4444" },
+            { id: 4, en: "Enjoy your meal!", es: "¡Buen provecho!", icon: "utensils", color: "#16a34a" },
+            { id: 5, en: "Good morning", es: "Buenos días", icon: "heart", color: "#ec4899" },
+            { id: 6, en: "How can I help you?", es: "¿Cómo puedo ayudarle?", icon: "heart", color: "#3b82f6" },
+            { id: 7, en: "Take a seat, please", es: "Tome asiento, por favor", icon: "utensils", color: "#6366f1" },
+            { id: 8, en: "Do you want more?", es: "¿Quiere más?", icon: "utensils", color: "#f97316" },
+            { id: 9, en: "What time is it?", es: "¿Qué hora es?", icon: "clock", color: "#64748b" },
+            { id: 10, en: "See you tomorrow", es: "Nos vemos mañana", icon: "clock", color: "#10b981" },
+            { id: 11, en: "See you next week", es: "Nos vemos la próxima semana", icon: "clock", color: "#06b6d4" }
         ];
 
         const App = () => {
             const [cards, setCards] = useState([]);
             const [flipped, setFlipped] = useState([]);
             const [solved, setSolved] = useState([]);
+            const [disabled, setDisabled] = useState(false);
 
-            useEffect(() => {
+            // Inicializar el juego con cartas mezcladas
+            const initializeGame = useCallback(() => {
                 const gameCards = [];
                 PHRASES.forEach(p => {
                     gameCards.push({ id: `en-${p.id}`, content: p.en, matchId: p.id, lang: 'EN' });
                     gameCards.push({ id: `es-${p.id}`, content: p.es, matchId: p.id, lang: 'ES' });
                 });
                 setCards(gameCards.sort(() => Math.random() - 0.5));
+                setSolved([]);
+                setFlipped([]);
+                setDisabled(false);
             }, []);
 
+            useEffect(() => {
+                initializeGame();
+            }, [initializeGame]);
+
             const handleCardClick = (id) => {
-                if (flipped.includes(id) || solved.includes(id) || flipped.length === 2) return;
+                if (disabled || flipped.includes(id) || solved.includes(id) || flipped.length === 2) return;
+                
                 const newFlipped = [...flipped, id];
                 setFlipped(newFlipped);
+
                 if (newFlipped.length === 2) {
+                    setDisabled(true);
                     const first = cards.find(c => c.id === newFlipped[0]);
                     const second = cards.find(c => c.id === newFlipped[1]);
+
                     if (first.matchId === second.matchId && first.lang !== second.lang) {
                         setSolved([...solved, first.id, second.id]);
                         setFlipped([]);
+                        setDisabled(false);
                     } else {
-                        setTimeout(() => setFlipped([]), 1000);
+                        setTimeout(() => {
+                            setFlipped([]);
+                            setDisabled(false);
+                        }, 1000);
                     }
                 }
             };
 
             return (
-                <div className="min-h-screen bg-slate-100 p-8">
-                    <h1 className="text-2xl font-black text-center mb-8 uppercase tracking-tighter">Oppenheimer Park Game</h1>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-                        {cards.map(card => (
-                            <div key={card.id} onClick={() => handleCardClick(card.id)} className={`relative h-32 cursor-pointer transition-all duration-500 preserve-3d ${flipped.includes(card.id) || solved.includes(card.id) ? '[transform:rotateY(180deg)]' : ''}`}>
-                                <div className="absolute inset-0 bg-white border-2 border-slate-200 rounded-2xl flex items-center justify-center backface-hidden shadow-sm font-bold text-slate-300 text-2xl">?</div>
-                                <div className={`absolute inset-0 [transform:rotateY(180deg)] backface-hidden rounded-2xl border-2 p-4 flex flex-col items-center justify-center text-center shadow-md ${card.lang === 'EN' ? 'bg-blue-50 border-blue-400' : 'bg-rose-50 border-rose-400'}`}>
-                                    <p className="text-sm font-black">{card.content}</p>
+                <div className="min-h-screen bg-slate-50 py-12 px-4">
+                    <div className="max-w-4xl mx-auto">
+                        <header className="text-center mb-12">
+                            <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-2">
+                                Service & Care Game
+                            </h1>
+                            <p className="text-rose-600 font-bold italic">Oppenheimer Park Fieldhouse</p>
+                        </header>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {cards.map((card, index) => (
+                                <div 
+                                    key={card.id} 
+                                    onClick={() => handleCardClick(card.id)} 
+                                    className="relative h-36 cursor-pointer preserve-3d transition-all duration-500 animate-card"
+                                    style={{ 
+                                        transform: flipped.includes(card.id) || solved.includes(card.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                        animationDelay: `${index * 50}ms`
+                                    }}
+                                >
+                                    {/* Lado oculto (Frente) */}
+                                    <div className="absolute inset-0 bg-white border-4 border-slate-100 rounded-3xl flex items-center justify-center backface-hidden shadow-sm">
+                                        <span className="text-3xl font-black text-slate-200">?</span>
+                                    </div>
+
+                                    {/* Lado revelado (Atrás) */}
+                                    <div className={`absolute inset-0 [transform:rotateY(180deg)] backface-hidden rounded-3xl border-4 p-4 flex flex-col items-center justify-center text-center shadow-md ${
+                                        card.lang === 'EN' ? 'bg-blue-50 border-blue-400' : 'bg-rose-50 border-rose-400'
+                                    }`}>
+                                        <p className="text-xs font-black uppercase mb-1 opacity-50">
+                                            {card.lang === 'EN' ? 'English' : 'Español'}
+                                        </p>
+                                        <p className={`font-bold leading-tight ${card.content.length > 20 ? 'text-[10px]' : 'text-xs'}`}>
+                                            {card.content}
+                                        </p>
+                                        {solved.includes(card.id) && (
+                                            <div className="mt-2 text-green-500">
+                                                <Icon name="check-circle-2" size={16} />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
+
+                        <div className="mt-12 text-center">
+                            <button 
+                                onClick={initializeGame}
+                                className="bg-slate-900 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-lg"
+                            >
+                                Reiniciar Juego
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
         };
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

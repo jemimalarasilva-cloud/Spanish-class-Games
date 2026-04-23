@@ -1,270 +1,329 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Coffee, Heart, RefreshCw, Volume2, MapPin, 
-  ChevronRight, ArrowLeft, Layers, Calendar
-} from 'lucide-react';
-
-const App = () => {
-  const [mode, setMode] = useState('menu'); 
-  const [buildType, setBuildType] = useState('numbers');
-  const [selectedParts, setSelectedParts] = useState({ hundred: 0, ten: 0, unit: 0 });
-  const [selectedSentence, setSelectedSentence] = useState({ subject: 'Yo', verbId: 'querer', object: 'un café' });
-  const [speechRate] = useState(0.7);
-
-  const speak = (text) => {
-    if (!text || text.includes("Selecciona")) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
-    utterance.rate = speechRate;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  // --- LÓGICA DE NÚMEROS (1-999) ---
-  const HUNDREDS = [
-    { val: 0, text: '' },
-    { val: 100, text: 'Cien', comb: 'Ciento' },
-    { val: 200, text: 'Doscientos' },
-    { val: 300, text: 'Trescientos' },
-    { val: 400, text: 'Cuatrocientos' },
-    { val: 500, text: 'Quinientos' },
-    { val: 600, text: 'Seiscientos' },
-    { val: 700, text: 'Setecientos' },
-    { val: 800, text: 'Ochocientos' },
-    { val: 900, text: 'Novecientos' }
-  ];
-
-  const TENS = [
-    { val: 0, text: '' },
-    { val: 10, text: 'Diez' },
-    { val: 20, text: 'Veinte' },
-    { val: 30, text: 'Treinta' },
-    { val: 40, text: 'Cuarenta' },
-    { val: 50, text: 'Cincuenta' }
-  ];
-
-  const UNITS = [
-    { val: 0, text: '' },
-    { val: 1, text: 'uno' },
-    { val: 2, text: 'dos' },
-    { val: 3, text: 'tres' },
-    { val: 4, text: 'cuatro' },
-    { val: 5, text: 'cinco' },
-    { val: 6, text: 'seis' },
-    { val: 7, text: 'siete' },
-    { val: 8, text: 'ocho' },
-    { val: 9, text: 'nueve' }
-  ];
-
-  const getFullNumberText = () => {
-    const { hundred, ten, unit } = selectedParts;
-    if (hundred === 0 && ten === 0 && unit === 0) return "Selecciona los números";
-
-    let result = "";
-
-    // 1. Procesar Centenas
-    if (hundred > 0) {
-      const hObj = HUNDREDS.find(h => h.val === hundred);
-      if (hundred === 100) {
-        result += (ten > 0 || unit > 0) ? hObj.comb : hObj.text;
-      } else {
-        result += hObj.text;
-      }
-    }
-
-    // 2. Procesar Decenas y Unidades (Reglas especiales de 11-29)
-    const rest = ten + unit;
-    if (rest > 0) {
-      if (result !== "") result += " ";
-      
-      if (rest >= 11 && rest <= 15) {
-        const specials = { 11: 'once', 12: 'doce', 13: 'trece', 14: 'catorce', 15: 'quince' };
-        result += specials[rest];
-      } else if (rest >= 16 && rest <= 19) {
-        result += "dieci" + UNITS.find(u => u.val === unit).text;
-      } else if (rest === 20) {
-        result += "veinte";
-      } else if (rest >= 21 && rest <= 29) {
-        const unitName = UNITS.find(u => u.val === unit).text;
-        result += "veinti" + (unitName === 'uno' ? 'un' : unitName);
-      } else {
-        // Regla general: Treinta y uno, etc.
-        if (ten > 0) result += TENS.find(t => t.val === ten).text;
-        if (ten > 0 && unit > 0) result += " y ";
-        if (unit > 0) result += UNITS.find(u => u.val === unit).text;
-      }
-    }
-
-    return result.charAt(0).toUpperCase() + result.slice(1);
-  };
-
-  // --- LÓGICA DE ORACIONES (Conjugación) ---
-  const SUBJECTS = [
-    { id: 'yo', text: 'Yo' },
-    { id: 'tu', text: 'Tú' },
-    { id: 'usted', text: 'Usted' },
-    { id: 'nosotros', text: 'Nosotros' }
-  ];
-
-  const VERBS = [
-    { 
-      id: 'querer', 
-      label: 'Querer', 
-      forms: { yo: 'quiero', tu: 'quieres', usted: 'quiere', nosotros: 'queremos' } 
-    },
-    { 
-      id: 'necesitar', 
-      label: 'Necesitar', 
-      forms: { yo: 'necesito', tu: 'necesitas', usted: 'necesita', nosotros: 'necesitamos' } 
-    },
-    { 
-      id: 'comer', 
-      label: 'Comer', 
-      forms: { yo: 'como', tu: 'comes', usted: 'come', nosotros: 'comemos' } 
-    }
-  ];
-
-  const OBJECTS = ['un café', 'leche', 'ayuda', 'mañana', 'azúcar'];
-
-  const getFullSentence = () => {
-    const { subject, verbId, object } = selectedSentence;
-    const verbObj = VERBS.find(v => v.id === verbId);
-    const subObj = SUBJECTS.find(s => s.text === subject);
-    const conjugatedVerb = verbObj.forms[subObj.id];
-    return `${subject} ${conjugatedVerb} ${object}.`;
-  };
-
-  if (mode === 'menu') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50">
-        <MapPin className="text-rose-600 w-12 h-12 mb-4" />
-        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-2">Oppenheimer Hub</h1>
-        <p className="text-rose-600 font-bold italic mb-10 text-center uppercase tracking-widest text-[10px]">Herramientas de Lenguaje</p>
-        
-        <div className="grid gap-4 w-full max-w-sm">
-          <button onClick={() => setMode('builder')} className="group bg-slate-900 p-6 rounded-3xl shadow-lg hover:scale-105 transition-all flex items-center gap-4 text-left">
-            <div className="bg-slate-800 p-3 rounded-2xl"><Layers className="text-white w-6 h-6" /></div>
-            <div>
-              <h2 className="font-black text-white uppercase leading-none">Constructor</h2>
-              <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Gramática correcta</p>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oppenheimer Hub - Bilingual Learning Center</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and Babel for single-file operation -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-card { animation: fadeIn 0.4s ease-out forwards; }
+        .perspective-1000 { perspective: 1000px; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-rose-600 mb-4"></div>
+                <p class="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading Hub / Cargando...</p>
             </div>
-          </button>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-2xl mx-auto">
-        <button onClick={() => setMode('menu')} className="mb-6 flex items-center gap-2 text-slate-400 font-bold uppercase text-[10px] tracking-widest hover:text-rose-600 transition-colors">
-          <ArrowLeft className="w-3 h-3" /> Volver al Menú
-        </button>
-
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-slate-100">
-          <div className="flex gap-2 mb-8 justify-center">
-            <button onClick={() => setBuildType('numbers')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all ${buildType === 'numbers' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
-              <Calendar className="w-4 h-4" /> Números
-            </button>
-            <button onClick={() => setBuildType('sentences')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase transition-all ${buildType === 'sentences' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
-              <Heart className="w-4 h-4" /> Oraciones
-            </button>
-          </div>
-
-          {buildType === 'numbers' ? (
-            <div className="space-y-8">
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">1. Selecciona Centena</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {HUNDREDS.map(h => (
-                    <button key={h.val} onClick={() => setSelectedParts({...selectedParts, hundred: h.val})} className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedParts.hundred === h.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {h.val || '0'}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">2. Selecciona Decena</p>
-                <div className="grid grid-cols-6 gap-2">
-                  {TENS.map(t => (
-                    <button key={t.val} onClick={() => setSelectedParts({...selectedParts, ten: t.val})} className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedParts.ten === t.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {t.val || '0'}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">3. Selecciona Unidad</p>
-                <div className="grid grid-cols-5 gap-2">
-                  {UNITS.map(u => (
-                    <button key={u.val} onClick={() => setSelectedParts({...selectedParts, unit: u.val})} className={`py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedParts.unit === u.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {u.val || '0'}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">1. ¿Quién realiza la acción?</p>
-                <div className="flex flex-wrap gap-2">
-                  {SUBJECTS.map(s => (
-                    <button key={s.id} onClick={() => setSelectedSentence({...selectedSentence, subject: s.text})} className={`px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedSentence.subject === s.text ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {s.text}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">2. Selecciona Acción (Verbo)</p>
-                <div className="flex flex-wrap gap-2">
-                  {VERBS.map(v => (
-                    <button key={v.id} onClick={() => setSelectedSentence({...selectedSentence, verbId: v.id})} className={`px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedSentence.verbId === v.id ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <p className="text-[10px] font-black uppercase text-slate-300 mb-3 tracking-widest">3. ¿Qué desea / necesita?</p>
-                <div className="flex flex-wrap gap-2">
-                  {OBJECTS.map(o => (
-                    <button key={o} onClick={() => setSelectedSentence({...selectedSentence, object: o})} className={`px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all ${selectedSentence.object === o ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>
-                      {o}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </div>
-          )}
-
-          <div className="mt-12 pt-8 border-t-2 border-slate-50">
-            <div className="bg-slate-900 rounded-[2rem] p-8 text-center shadow-2xl overflow-hidden relative group">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Resultado Gramatical</p>
-              <h2 className="text-3xl font-black text-white mb-6 leading-tight">
-                {buildType === 'numbers' ? getFullNumberText() : getFullSentence()}
-              </h2>
-              <button 
-                onClick={() => speak(buildType === 'numbers' ? getFullNumberText() : getFullSentence())}
-                className="inline-flex items-center gap-3 bg-white text-slate-900 px-8 py-4 rounded-full font-black uppercase text-xs tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-xl active:scale-95"
-              >
-                <Volume2 className="w-5 h-5" /> Escuchar Pronunciación
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <p className="text-center mt-10 text-slate-300 font-bold text-[9px] uppercase tracking-widest">
-          Sistema de Lógica Gramatical - Oppenheimer Park
-        </p>
-      </div>
     </div>
-  );
-};
 
-export default App;
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        /**
+         * Componente de Icono: Inserción segura para evitar errores de DOM con React.
+         */
+        const Icon = ({ name, color, size = 20 }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && iconRef.current) {
+                    iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                    window.lucide.createIcons({
+                        root: iconRef.current,
+                        attrs: { color, width: size, height: size, 'stroke-width': 2 }
+                    });
+                }
+            }, [name, color, size]);
+            return <span ref={iconRef} className="inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }} />;
+        };
+
+        /**
+         * Ilustraciones para Preposiciones.
+         */
+        const PrepositionIllustration = ({ id, className = "w-full h-full" }) => {
+            const boxColor = "#cbd5e1"; 
+            const ballColor = "#f43f5e"; 
+            const illustrations = {
+                101: ( <svg viewBox="0 0 100 100" className={className}><rect x="30" y="50" width="40" height="40" fill={boxColor} rx="4" /><circle cx="50" cy="25" r="12" fill={ballColor} /></svg> ),
+                102: ( <svg viewBox="0 0 100 100" className={className}><rect x="30" y="20" width="40" height="40" fill={boxColor} rx="4" opacity="0.7" /><circle cx="50" cy="80" r="12" fill={ballColor} /><rect x="30" y="20" width="40" height="40" fill="none" stroke={boxColor} strokeWidth="2" rx="4" /></svg> ),
+                103: ( <svg viewBox="0 0 100 100" className={className}><rect x="25" y="25" width="50" height="50" fill={boxColor} rx="4" opacity="0.5" /><circle cx="50" cy="50" r="12" fill={ballColor} /><rect x="25" y="25" width="50" height="50" fill="none" stroke={boxColor} strokeWidth="2" rx="4" /></svg> ),
+                104: ( <svg viewBox="0 0 100 100" className={className}><rect x="15" y="35" width="40" height="40" fill={boxColor} rx="4" /><circle cx="75" cy="55" r="12" fill={ballColor} /></svg> ),
+                105: ( <svg viewBox="0 0 100 100" className={className}><rect x="35" y="25" width="40" height="40" fill={boxColor} rx="4" /><circle cx="45" cy="70" r="15" fill={ballColor} /></svg> ),
+                106: ( <svg viewBox="0 0 100 100" className={className}><circle cx="55" cy="35" r="12" fill={ballColor} /><rect x="25" y="45" width="40" height="40" fill={boxColor} rx="4" /></svg> ),
+            };
+            return illustrations[id] || null;
+        };
+
+        // --- BASES DE DATOS ---
+        const DATA_SERVICE = [
+            { id: 1, en: "Would you like coffee or tea?", es: "¿Quiere café o té?", icon: "coffee" },
+            { id: 2, en: "Sugar or milk?", es: "¿Azúcar o leche?", icon: "coffee" },
+            { id: 3, en: "Careful, it's hot!", es: "¡Cuidado, está caliente!", icon: "info" },
+            { id: 4, en: "Enjoy your meal!", es: "¡Buen provecho!", icon: "utensils" },
+        ];
+        const DATA_PREP = [
+            { id: 101, en: "Up / Above", es: "Arriba / Encima", icon: "box" },
+            { id: 102, en: "Down / Under", es: "Abajo / Debajo", icon: "box" },
+            { id: 103, en: "Inside", es: "Adentro / Dentro", icon: "box" },
+            { id: 104, en: "Next to", es: "Al lado de", icon: "box" },
+        ];
+        const DATA_NUMBERS = [
+            { id: 301, en: "One hundred", es: "Cien", icon: "hash" },
+            { id: 302, en: "Five hundred", es: "Quinientos", icon: "hash" },
+            { id: 303, en: "One thousand", es: "Mil", icon: "hash" },
+            { id: 304, en: "Date / Day", es: "Fecha / Día", icon: "calendar" },
+        ];
+
+        // --- CONSTRUCTOR DATA ---
+        const HUNDREDS = [
+            { val: 0, text: '' }, { val: 100, text: 'Cien', comb: 'Ciento' }, { val: 200, text: 'Doscientos' },
+            { val: 300, text: 'Trescientos' }, { val: 500, text: 'Quinientos' }, { val: 900, text: 'Novecientos' }
+        ];
+        const TENS = [
+            { val: 0, text: '' }, { val: 10, text: 'Diez' }, { val: 20, text: 'Veinte' },
+            { val: 30, text: 'Treinta' }, { val: 40, text: 'Cuarenta' }
+        ];
+        const UNITS = [
+            { val: 0, text: '' }, { val: 1, text: 'uno' }, { val: 2, text: 'dos' },
+            { val: 3, text: 'tres' }, { val: 4, text: 'cuatro' }, { val: 5, text: 'cinco' }
+        ];
+        const SUBJECTS = [{ id: 'yo', text: 'Yo' }, { id: 'tu', text: 'Tú' }, { id: 'nosotros', text: 'Nosotros' }];
+        const VERBS = [
+            { id: 'querer', label: 'Querer', forms: { yo: 'quiero', tu: 'quieres', nosotros: 'queremos' } },
+            { id: 'necesitar', label: 'Necesitar', forms: { yo: 'necesito', tu: 'necesitas', nosotros: 'necesitamos' } }
+        ];
+        const OBJECTS = ['un café', 'ayuda', 'mañana', 'azúcar'];
+
+        const App = () => {
+            const [mode, setMode] = useState('menu'); // menu, service, prep, numbers, builder
+            const [view, setView] = useState('game'); 
+            const [cards, setCards] = useState([]);
+            const [flipped, setFlipped] = useState([]);
+            const [solved, setSolved] = useState([]);
+            const [disabled, setDisabled] = useState(false);
+            const [buildType, setBuildType] = useState('numbers');
+            const [selectedParts, setSelectedParts] = useState({ hundred: 0, ten: 0, unit: 0 });
+            const [selectedSentence, setSelectedSentence] = useState({ subject: 'Yo', verbId: 'querer', object: 'un café' });
+
+            const speak = (text) => {
+                if (!text || text.includes("Select")) return;
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'es-ES';
+                utterance.rate = 0.7;
+                window.speechSynthesis.speak(utterance);
+            };
+
+            const getFullNumberText = () => {
+                const { hundred, ten, unit } = selectedParts;
+                if (hundred === 0 && ten === 0 && unit === 0) return "Select Numbers / Selecciona Números";
+                let res = "";
+                if (hundred > 0) {
+                    const h = HUNDREDS.find(x => x.val === hundred);
+                    res += (hundred === 100 && (ten > 0 || unit > 0)) ? h.comb : h.text;
+                }
+                const rest = ten + unit;
+                if (rest > 0) {
+                    if (res !== "") res += " ";
+                    if (rest >= 11 && rest <= 15) {
+                        const spec = { 11: 'once', 12: 'doce', 13: 'trece', 14: 'catorce', 15: 'quince' };
+                        res += spec[rest];
+                    } else if (ten === 20 && unit > 0) {
+                        res += "veinti" + UNITS.find(x => x.val === unit).text;
+                    } else {
+                        if (ten > 0) res += TENS.find(x => x.val === ten).text;
+                        if (ten > 0 && unit > 0) res += " y ";
+                        if (unit > 0) res += UNITS.find(x => x.val === unit).text;
+                    }
+                }
+                return res.charAt(0).toUpperCase() + res.slice(1);
+            };
+
+            const getFullSentence = () => {
+                const { subject, verbId, object } = selectedSentence;
+                const v = VERBS.find(x => x.id === verbId);
+                const s = SUBJECTS.find(x => x.text === subject);
+                return `${subject} ${v.forms[s.id]} ${object}.`;
+            };
+
+            const initGame = (type) => {
+                let source = [];
+                if (type === 'service') source = DATA_SERVICE;
+                if (type === 'prep') source = DATA_PREP;
+                if (type === 'numbers') source = DATA_NUMBERS;
+                const gCards = [];
+                source.forEach(p => {
+                    gCards.push({ id: `en-${p.id}`, content: p.en, matchId: p.id, lang: 'EN' });
+                    gCards.push({ id: `es-${p.id}`, content: p.es, matchId: p.id, lang: 'ES' });
+                });
+                setCards(gCards.sort(() => Math.random() - 0.5));
+                setSolved([]); setFlipped([]); setDisabled(false);
+                setMode(type); setView('game');
+            };
+
+            const handleCardClick = (id) => {
+                if (disabled || flipped.includes(id) || solved.includes(id)) return;
+                const c = cards.find(x => x.id === id);
+                if (c.lang === 'ES') speak(c.content);
+                const newFlipped = [...flipped, id];
+                setFlipped(newFlipped);
+                if (newFlipped.length === 2) {
+                    setDisabled(true);
+                    const c1 = cards.find(x => x.id === newFlipped[0]);
+                    const c2 = cards.find(x => x.id === newFlipped[1]);
+                    if (c1.matchId === c2.matchId && c1.lang !== c2.lang) {
+                        setSolved(prev => [...prev, c1.id, c2.id]);
+                        setFlipped([]); setDisabled(false);
+                    } else {
+                        setTimeout(() => { setFlipped([]); setDisabled(false); }, 1000);
+                    }
+                }
+            };
+
+            if (mode === 'menu') {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+                        <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-slate-100">
+                            <Icon name="map-pin" color="#e11d48" size={40} />
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-1 text-center">Oppenheimer Hub</h1>
+                        <p className="text-rose-600 font-bold italic mb-10 text-[10px] uppercase tracking-[0.2em] text-center">Learning Center / Centro de Aprendizaje</p>
+                        
+                        <div className="grid gap-3 w-full max-w-sm">
+                            <button onClick={() => initGame('service')} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all flex items-center gap-4 group border-2 border-transparent hover:border-rose-500">
+                                <div className="bg-rose-100 p-3 rounded-2xl"><Icon name="coffee" color="#e11d48" size={24} /></div>
+                                <div className="flex-grow text-left">
+                                    <h2 className="font-black text-slate-800 uppercase leading-none text-sm">Service & Care</h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1">Servicio y Trato</p>
+                                </div>
+                                <Icon name="chevron-right" color="#cbd5e1" size={16} />
+                            </button>
+                            <button onClick={() => initGame('prep')} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all flex items-center gap-4 group border-2 border-transparent hover:border-blue-500">
+                                <div className="bg-blue-100 p-3 rounded-2xl"><Icon name="box" color="#3b82f6" size={24} /></div>
+                                <div className="flex-grow text-left">
+                                    <h2 className="font-black text-slate-800 uppercase leading-none text-sm">Prepositions</h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1">Preposiciones</p>
+                                </div>
+                                <Icon name="chevron-right" color="#cbd5e1" size={16} />
+                            </button>
+                            <button onClick={() => initGame('numbers')} className="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl transition-all flex items-center gap-4 group border-2 border-transparent hover:border-emerald-500">
+                                <div className="bg-emerald-100 p-3 rounded-2xl"><Icon name="calendar" color="#10b981" size={24} /></div>
+                                <div className="flex-grow text-left">
+                                    <h2 className="font-black text-slate-800 uppercase leading-none text-sm">Numbers & Dates</h2>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1">Números y Fechas</p>
+                                </div>
+                                <Icon name="chevron-right" color="#cbd5e1" size={16} />
+                            </button>
+                            <button onClick={() => setMode('builder')} className="bg-slate-900 p-6 rounded-3xl shadow-lg hover:scale-105 transition-all flex items-center gap-4 mt-4">
+                                <div className="bg-slate-800 p-3 rounded-2xl"><Icon name="layers" color="#ffffff" size={24} /></div>
+                                <div className="flex-grow text-left text-white">
+                                    <h2 className="font-black uppercase leading-none text-sm tracking-tight">Sentence Builder</h2>
+                                    <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase">Constructor de Oraciones</p>
+                                </div>
+                                <Icon name="chevron-right" color="#334155" size={16} />
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (mode === 'builder') {
+                return (
+                    <div className="min-h-screen bg-slate-50 p-6">
+                        <div className="max-w-2xl mx-auto">
+                            <button onClick={() => setMode('menu')} className="mb-6 flex items-center gap-2 text-slate-400 font-bold uppercase text-[9px] tracking-widest hover:text-rose-600 transition-colors">
+                                <Icon name="arrow-left" color="currentColor" size={12} /> Back / Volver
+                            </button>
+                            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-slate-100">
+                                <div className="flex gap-2 mb-8 justify-center">
+                                    <button onClick={() => setBuildType('numbers')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${buildType === 'numbers' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}>Numbers / Números</button>
+                                    <button onClick={() => setBuildType('sentences')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${buildType === 'sentences' ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-50 text-slate-400'}`}>Sentences / Oraciones</button>
+                                </div>
+                                {buildType === 'numbers' ? (
+                                    <div className="space-y-6">
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Hundreds / Centenas</p><div className="flex flex-wrap gap-2">{HUNDREDS.map(h => <button key={h.val} onClick={() => setSelectedParts({...selectedParts, hundred: h.val})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedParts.hundred === h.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>{h.val || '0'}</button>)}</div></div>
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Tens / Decenas</p><div className="flex flex-wrap gap-2">{TENS.map(t => <button key={t.val} onClick={() => setSelectedParts({...selectedParts, ten: t.val})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedParts.ten === t.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>{t.val || '0'}</button>)}</div></div>
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Units / Unidades</p><div className="flex flex-wrap gap-2">{UNITS.map(u => <button key={u.val} onClick={() => setSelectedParts({...selectedParts, unit: u.val})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedParts.unit === u.val ? 'bg-blue-50 border-blue-600 text-blue-600' : 'bg-white border-slate-50 text-slate-300'}`}>{u.val || '0'}</button>)}</div></div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Subject / Sujeto</p><div className="flex flex-wrap gap-2">{SUBJECTS.map(s => <button key={s.id} onClick={() => setSelectedSentence({...selectedSentence, subject: s.text})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedSentence.subject === s.text ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>{s.text}</button>)}</div></div>
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Verb / Verbo</p><div className="flex flex-wrap gap-2">{VERBS.map(v => <button key={v.id} onClick={() => setSelectedSentence({...selectedSentence, verbId: v.id})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedSentence.verbId === v.id ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>{v.label}</button>)}</div></div>
+                                        <div><p className="text-[9px] font-black uppercase text-slate-300 mb-2">Object / Objeto</p><div className="flex flex-wrap gap-2">{OBJECTS.map(o => <button key={o} onClick={() => setSelectedSentence({...selectedSentence, object: o})} className={`px-3 py-2 rounded-lg text-[10px] font-bold border-2 ${selectedSentence.object === o ? 'bg-rose-50 border-rose-600 text-rose-600' : 'bg-white border-slate-50 text-slate-300'}`}>{o}</button>)}</div></div>
+                                    </div>
+                                )}
+                                <div className="mt-10 p-8 bg-slate-900 rounded-[2.5rem] text-center shadow-2xl overflow-hidden">
+                                    <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Result / Resultado</p>
+                                    <h2 className="text-2xl font-black text-white mb-6 leading-tight min-h-[3rem] flex items-center justify-center">
+                                        {buildType === 'numbers' ? getFullNumberText() : getFullSentence()}
+                                    </h2>
+                                    <button onClick={() => speak(buildType === 'numbers' ? getFullNumberText() : getFullSentence())} className="bg-white text-slate-900 px-8 py-4 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 mx-auto active:scale-95 transition-all hover:bg-rose-500 hover:text-white shadow-xl">
+                                        <Icon name="volume-2" color="currentColor" size={16} /> Listen / Escuchar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-6">
+                    <div className="max-w-4xl mx-auto">
+                        <button onClick={() => setMode('menu')} className="mb-6 flex items-center gap-2 text-slate-400 font-bold uppercase text-[9px] tracking-widest hover:text-rose-600 transition-colors">
+                            <Icon name="arrow-left" color="currentColor" size={12} /> Back / Volver
+                        </button>
+                        <header className="text-center mb-10 uppercase tracking-tighter">
+                            <h1 className="text-3xl font-black text-slate-900 leading-none">
+                                {mode === 'service' ? 'Service & Care' : mode === 'prep' ? 'Prepositions' : 'Numbers'}
+                            </h1>
+                            <p className="text-rose-600 font-bold italic text-[10px] mt-2 uppercase tracking-widest leading-none">
+                                {mode === 'service' ? 'Servicio y Trato' : mode === 'prep' ? 'Preposiciones' : 'Números'}
+                            </p>
+                        </header>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-card">
+                            {cards.map(card => (
+                                <div key={card.id} className="h-32 perspective-1000" onClick={() => handleCardClick(card.id)}>
+                                    <div className="relative w-full h-full transition-all duration-500 preserve-3d" style={{ transform: (flipped.includes(card.id) || solved.includes(card.id)) ? 'rotateY(180deg)' : 'none' }}>
+                                        <div className="absolute inset-0 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center backface-hidden shadow-sm font-black text-slate-100 text-3xl">?</div>
+                                        <div className={`absolute inset-0 rotateY-180 backface-hidden rounded-2xl border-2 p-3 flex flex-col items-center justify-center text-center shadow-md ${card.lang === 'EN' ? 'bg-blue-50 border-blue-400' : 'bg-rose-50 border-rose-400'}`} style={{ transform: 'rotateY(180deg)' }}>
+                                            {mode === 'prep' && <div className="w-10 h-10 mb-1 opacity-60"><PrepositionIllustration id={card.matchId} /></div>}
+                                            <p className="text-[8px] font-bold uppercase opacity-50 mb-1">{card.lang === 'EN' ? 'English' : 'Español'}</p>
+                                            <p className="font-black text-slate-800 text-[10px] leading-tight">{card.content}</p>
+                                            {solved.includes(card.id) && <Icon name="check-circle-2" color="#10b981" size={14} />}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-12 text-center">
+                            <button onClick={() => initGame(mode)} className="bg-slate-900 text-white px-8 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-2 mx-auto active:scale-95 transition-all shadow-lg hover:bg-black">
+                                <Icon name="refresh-cw" color="#ffffff" size={14} /> Restart / Reiniciar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
